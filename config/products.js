@@ -33,6 +33,13 @@
 
 export default {
   eduzz: {},
-  hotmart: {},
+  hotmart: {
+    '__PRODUCT_ID__': {
+      name: '300 Projets Mobilier Maker',
+      enchargeTag: null,
+      manychatTagId: null,
+      googleAdsConversionActionId: null,
+    },
+  },
   kiwify: {},
 };
