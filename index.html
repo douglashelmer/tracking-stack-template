@@ -588,7 +588,7 @@ footer a{color:#777}
         <li>Téléchargement instantané dès l'achat</li>
         <li>Accès à vie + mises à jour incluses</li>
       </ul>
-      <a href="javascript:void(0)" onclick="goCheckout()" class="btn-cta">🛒 Télécharger le Guide Maintenant</a>
+      <a href="__CHECKOUT_URL__" id="checkout-cta" class="btn-cta" data-checkout="hotmart">🛒 Télécharger le Guide Maintenant</a>
       <p class="btn-cta-sub">🔒 Paiement 100% sécurisé &nbsp;|&nbsp; Format PDF &nbsp;|&nbsp; Accès immédiat</p>
       <div class="guarantee">
         <div class="guarantee-icon">🛡️</div>
@@ -768,24 +768,45 @@ fetch('/tracker',{method:'POST',headers:{'Content-Type':'application/json'},
 fetch('/checkout-session',{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify({trk:_trk}),keepalive:true}).catch(()=>{});
 
-function goCheckout(){
+// Build the real checkout destination, appending the trk attribution as the
+// platform's custom field (xcod/trk/sck) so the webhook can match the sale.
+function buildCheckoutUrl(){
   const trkVal = sessionStorage.getItem('trk') || _trk;
-  const icId   = crypto.randomUUID();
+  let url = CHECKOUT_URL;
+  const sep = url.includes('?') ? '&' : '?';
+  if(CHECKOUT_PLATFORM==='eduzz')        url += sep + 'trk='  + encodeURIComponent(trkVal);
+  else if(CHECKOUT_PLATFORM==='hotmart') url += sep + 'xcod=' + encodeURIComponent(trkVal);
+  else if(CHECKOUT_PLATFORM==='kiwify')  url += sep + 'sck='  + encodeURIComponent(trkVal);
+  return url;
+}
+
+// Fire the InitiateCheckout pixel + server event. keepalive lets these
+// complete while the browser performs the native link navigation, so we do
+// NOT call preventDefault and do NOT redirect by script.
+function fireInitiateCheckout(){
+  const icId = crypto.randomUUID();
   if(typeof fbq!=='undefined') fbq('track','InitiateCheckout',{},{eventID:icId});
   fetch('/tracker',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({event_name:'InitiateCheckout',event_id:icId,page_url:location.href}),keepalive:true}).catch(()=>{});
-  let url = CHECKOUT_URL;
-  const sep = url.includes('?') ? '&' : '?';
-  if(CHECKOUT_PLATFORM==='eduzz')        url += sep + 'trk='  + trkVal;
-  else if(CHECKOUT_PLATFORM==='hotmart') url += sep + 'xcod=' + trkVal;
-  else if(CHECKOUT_PLATFORM==='kiwify')  url += sep + 'sck='  + trkVal;
-  setTimeout(()=>{ window.location.href = url; }, 150);
+}
+
+// Put the real destination URL directly in each checkout <a href> so Google
+// Tag Manager's built-in link-click listener identifies the click natively as
+// gtm.linkClick (with a usable Click URL). Any anchor flagged data-checkout
+// is wired here — keeps id/class in markup, behaviour in one place.
+function initCheckoutLinks(){
+  const url = buildCheckoutUrl();
+  document.querySelectorAll('a[data-checkout]').forEach(a=>{
+    a.setAttribute('href', url);
+    a.addEventListener('click', fireInitiateCheckout);
+  });
 }
 
 // INIT
 renderCards('all');
 triggerFade();
 startCountdown();
+initCheckoutLinks();
 </script>
 </body>
 </html>
